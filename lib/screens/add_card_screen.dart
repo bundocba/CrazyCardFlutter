@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:crazy_card_bun/card_content.dart';
-import 'package:crazy_card_bun/card_data.dart';
-import 'package:crazy_card_bun/services/session_manager.dart';
+import '../models/card_model.dart';
+import '../services/card_service.dart';
+import '../card_data.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddCardScreen extends StatefulWidget {
-  final Function(CardContent)? onCardAdded;
-  
-  const AddCardScreen({
-    super.key, 
-    this.onCardAdded,
-  });
+  const AddCardScreen({super.key});
 
   @override
   State<AddCardScreen> createState() => _AddCardScreenState();
@@ -17,72 +13,117 @@ class AddCardScreen extends StatefulWidget {
 
 class _AddCardScreenState extends State<AddCardScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final _taskController = TextEditingController();
   final _penaltyController = TextEditingController();
-  final _numberController = TextEditingController();
-  String _selectedIconPath = 'assets/image/icon/Icon1.jpg'; // default icon
-  final SessionManager _sessionManager = SessionManager();
-
-  final List<String> _iconOptions = [
-    'assets/image/icon/Icon1.jpg',
-    'assets/image/icon/Icon2.jpg',
-    'assets/image/icon/Icon3.jpg',
-    'assets/image/icon/Icon4.jpg',
-    'assets/image/icon/Icon5.jpg',
-    'assets/image/icon/Icon6.jpg',
-    'assets/image/icon/Icon7.jpg',
-    'assets/image/icon/Icon8.jpg',
-  ];
+  late CardService _cardService;
+  int _selectedIconIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _suggestNextCardNumber();
+    _initializeCardService();
   }
 
-  Future<void> _suggestNextCardNumber() async {
-    final nextNumber = await _sessionManager.getNextCardNumber();
-    _numberController.text = nextNumber.toString();
+  Future<void> _initializeCardService() async {
+    final prefs = await SharedPreferences.getInstance();
+    _cardService = CardService(prefs);
+  }
+
+  Future<void> _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      // Get current deck to determine next card number
+      final currentDeck = await _cardService.getCurrentDeck();
+      int maxNumber = 0;
+      for (var card in currentDeck) {
+        if (card.number > maxNumber) {
+          maxNumber = card.number;
+        }
+      }
+
+      // Create new card with next number
+      final newCard = CardModel(
+        number: maxNumber + 1,
+        task: "Làm: ${_taskController.text}",
+        penalty: "Phạt: ${_penaltyController.text}",
+        iconPath: CardData.iconPaths[_selectedIconIndex],
+      );
+
+      // Add the card to the deck
+      currentDeck.add(newCard);
+      await _cardService.saveDeck(currentDeck);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thêm lá bài thành công!')),
+        );
+        Navigator.pop(context);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add New Card'),
+        title: const Text('Thêm lá bài mới'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Card Description',
-                ),
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a description';
-                  }
-                  return null;
-                },
+              const Text(
+                'Chọn biểu tượng:',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: CardData.iconPaths.length,
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedIconIndex = index;
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _selectedIconIndex == index
+                                ? Colors.blue
+                                : Colors.grey,
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Image.asset(
+                          CardData.iconPaths[index],
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
               TextFormField(
                 controller: _taskController,
                 decoration: const InputDecoration(
-                  labelText: 'Task',
+                  labelText: 'Nhiệm vụ',
+                  border: OutlineInputBorder(),
+                  hintText: 'Ví dụ: Hát một bài hát',
                 ),
-                maxLines: 2,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter a task';
+                    return 'Vui lòng nhập nhiệm vụ';
                   }
                   return null;
                 },
@@ -91,83 +132,28 @@ class _AddCardScreenState extends State<AddCardScreen> {
               TextFormField(
                 controller: _penaltyController,
                 decoration: const InputDecoration(
-                  labelText: 'Penalty',
+                  labelText: 'Hình phạt',
+                  border: OutlineInputBorder(),
+                  hintText: 'Ví dụ: Nhảy 10 cái',
                 ),
-                maxLines: 2,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter a penalty';
+                    return 'Vui lòng nhập hình phạt';
                   }
                   return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _numberController,
-                decoration: const InputDecoration(
-                  labelText: 'Card Number',
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a card number';
-                  }
-                  if (int.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedIconPath,
-                decoration: const InputDecoration(
-                  labelText: 'Select Icon',
-                ),
-                items: _iconOptions.map((String iconPath) {
-                  return DropdownMenuItem<String>(
-                    value: iconPath,
-                    child: Row(
-                      children: [
-                        Image.asset(
-                          iconPath,
-                          width: 30,
-                          height: 30,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(iconPath.split('/').last),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _selectedIconPath = newValue;
-                    });
-                  }
                 },
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
-                    final newCard = CardContent(
-                      number: int.parse(_numberController.text),
-                      task: _taskController.text,
-                      penalty: _penaltyController.text,
-                      iconPath: _selectedIconPath,
-                    );
-                    await CardData.addCard(newCard);
-                    if (widget.onCardAdded != null) {
-                      widget.onCardAdded!(newCard);
-                    }
-                    if (mounted) {
-                      Navigator.pop(context);
-                    }
-                  }
-                },
-                child: const Text('Add Card'),
+                onPressed: _submitForm,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: Colors.blue,
+                ),
+                child: const Text(
+                  'Thêm lá bài',
+                  style: TextStyle(fontSize: 16),
+                ),
               ),
             ],
           ),
@@ -178,11 +164,8 @@ class _AddCardScreenState extends State<AddCardScreen> {
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
     _taskController.dispose();
     _penaltyController.dispose();
-    _numberController.dispose();
     super.dispose();
   }
 }

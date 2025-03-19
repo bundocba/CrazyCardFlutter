@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/constants.dart';
 
 class SessionManager {
   static const String HIGHEST_CARD_NUMBER_KEY = 'highest_card_number';
@@ -16,7 +17,7 @@ class SessionManager {
   Future<void> resetSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(HIGHEST_CARD_NUMBER_KEY, DEFAULT_CARDS_COUNT);
-    await prefs.setString(DELETED_CARDS_KEY, '');
+    await prefs.remove(AppConstants.deletedCardsKey);
   }
 
   Future<int> getNextCardNumber() async {
@@ -29,22 +30,28 @@ class SessionManager {
 
   Future<Set<int>> getDeletedCards() async {
     final prefs = await SharedPreferences.getInstance();
-    String deletedCardsStr = prefs.getString(DELETED_CARDS_KEY) ?? '';
-    if (deletedCardsStr.isEmpty) return {};
-    return deletedCardsStr.split(',').map((e) => int.parse(e)).toSet();
+    final List<String>? deletedCards = prefs.getStringList(AppConstants.deletedCardsKey);
+    if (deletedCards == null) return {};
+    return deletedCards.map((e) => int.parse(e)).toSet();
   }
 
   Future<void> addDeletedCard(int cardNumber) async {
     final prefs = await SharedPreferences.getInstance();
     Set<int> deletedCards = await getDeletedCards();
     deletedCards.add(cardNumber);
-    await prefs.setString(DELETED_CARDS_KEY, deletedCards.join(','));
+    await prefs.setStringList(
+      AppConstants.deletedCardsKey,
+      deletedCards.map((e) => e.toString()).toList(),
+    );
   }
 
   Future<void> addDeletedCards(Set<int> cardNumbers) async {
     final prefs = await SharedPreferences.getInstance();
-    Set<int> deletedCards = await getDeletedCards();
-    deletedCards.addAll(cardNumbers);
-    await prefs.setString(DELETED_CARDS_KEY, deletedCards.join(','));
+    final currentDeleted = await getDeletedCards();
+    currentDeleted.addAll(cardNumbers);
+    await prefs.setStringList(
+      AppConstants.deletedCardsKey,
+      currentDeleted.map((e) => e.toString()).toList(),
+    );
   }
 }

@@ -1,31 +1,31 @@
 class CardModel {
-  final String challenge;
+  final int number;
+  final String iconPath;
+  final String task;
   final String penalty;
-  final int iconIndex;
-  final bool isCustomCard; // New field
 
   CardModel({
-    required this.challenge,
+    required this.number,
+    required this.iconPath,
+    required this.task,
     required this.penalty,
-    required this.iconIndex,
-    this.isCustomCard = false, // Default to false for original 52 cards
   });
-
-  Map<String, dynamic> toJson() {
-    return {
-      'challenge': challenge,
-      'penalty': penalty,
-      'iconIndex': iconIndex,
-      'isCustomCard': isCustomCard,
-    };
-  }
 
   factory CardModel.fromJson(Map<String, dynamic> json) {
     return CardModel(
-      challenge: json['challenge'],
+      number: json['number'],
+      iconPath: json['iconPath'],
+      task: json['task'],
       penalty: json['penalty'],
-      iconIndex: json['iconIndex'],
-      isCustomCard: json['isCustomCard'] ?? false,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'number': number,
+      'iconPath': iconPath,
+      'task': task,
+      'penalty': penalty,
+    };
   }
 }
